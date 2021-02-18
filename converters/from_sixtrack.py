@@ -3,6 +3,7 @@
 
 import pickle
 import os
+import numpy as np
 
 # Conversion from SixTrack is done using sixtracktools
 import sixtracktools
@@ -30,7 +31,8 @@ def generate_cobjects_lattice( path_to_testdata_dir, conf=dict() ):
 
     if  0 == cbuffer.tofile_normalised( path_to_lattice,
             conf.get( "normalised_addr", 0x1000 ) ):
-        print( f"**** -> Generated lattice data at: {path_to_lattice}" )
+        print( f"**** -> Generated cobjects lattice data at:" +
+                "\r\n****    {path_to_lattice}" )
     else:
         raise RuntimeError( "Problem during creation of lattice data" )
 
@@ -39,13 +41,25 @@ def generate_cobjects_lattice( path_to_testdata_dir, conf=dict() ):
 
     try:
         pickle.dump( line, open( path_to_pysixtrack_line, "wb" ) )
-        print( "**** -> Generated initial pysixtrack lattice data at:\r\n" +
-               f"****    {path_to_pysixtrack_line}" )
+        print( "**** -> Generated pysixtrack lattice data as python pickle: " +
+               f"\r\n****    {path_to_pysixtrack_line}" )
     except:
         raise RuntimeError(
-            "Unable to generate initial pysixtrack lattice data" )
+            "Unable to generate pysixtrack lattice data" )
 
-
+    if st.Demotrack_enabled() and st.Demotrack_belems_can_convert( cbuffer ):
+        dt_lattice = st.Demotrack_belems_convert( cbuffer )
+        if isinstance( dt_lattice, np.ndarray ) and \
+            st.Demotrack_belems_num_stored_objects( dt_lattice ) == \
+            cbuffer.num_objects:
+            path_to_dt_lattice = os.path.join(
+                path_to_testdata_dir, "demotrack_lattice.bin" )
+            dt_lattice.tofile( path_to_dt_lattice )
+            print( f"**** -> Generated demotrack lattice as flat array:" +
+                   f"\r\n****    {path_to_dt_lattice}" )
+        else:
+            raise RuntimeError(
+                "Unable to generate demotrack flat array lattice data" )
 
 
 def generate_cobjects_particles( path_to_testdata_dir, conf=dict() ):
