@@ -30,7 +30,8 @@ def generate_cobjects_lattice( path_to_testdata_dir, conf=dict() ):
 
     if  0 == cbuffer.tofile_normalised( path_to_lattice,
             conf.get( "normalised_addr", 0x1000 ) ):
-        print( f"**** -> Generated lattice data at: {path_to_lattice}" )
+        print( f"**** -> Generated cobjects lattice data at:" +
+                "\r\n****    {path_to_lattice}" )
     else:
         raise RuntimeError( "Problem during creation of lattice data" )
 
