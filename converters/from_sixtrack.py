@@ -100,14 +100,17 @@ def generate_cobjects_particles( path_to_testdata_dir, conf=dict() ):
         pysix_initial_pset.append(
             pysixtrack.Particles( **sixdump[ kk ].get_minimal_beam() ) )
 
+        pysix_initial_pset[ -1 ].turn = 0
+        pysix_initial_pset[ -1 ].state = 1
+        pysix_initial_pset[ -1 ].elemid = at_element
+        pysix_initial_pset[ -1 ].partid = jj
         p = st.st_SingleParticle( initial_p_buffer )
 
         pysixtrack_particle_to_pset(
-            pysix_initial_pset[ -1 ], pset, jj,
-            particle_id=jj, at_element=at_element )
+            pysix_initial_pset[ -1 ], pset, jj, particle_id=jj )
 
         pysixtrack_particle_to_single_particle(
-            pysix_initial_pset[ -1 ], p, particle_id=jj, at_element=at_element )
+            pysix_initial_pset[ -1 ], p, particle_id=jj )
 
     path_to_initial_pset = os.path.join(
         path_to_testdata_dir, "cobj_initial_particles.bin" )
@@ -149,7 +152,6 @@ def generate_cobjects_particles( path_to_testdata_dir, conf=dict() ):
     # -------------------------------------------------------------------------
     # Get sixtrack sequency-by-sequence data:
 
-    # Generate the initial particle disitribution buffers
     print( "****\r\n**** -> Generating sixtrack sequence-by-sequence particle data ..." )
 
     pset_buffer = st.CBuffer()
@@ -163,8 +165,11 @@ def generate_cobjects_particles( path_to_testdata_dir, conf=dict() ):
             kk = num_particles * ii + jj
             assert kk < num_dumps
             in_p = pysixtrack.Particles( **sixdump[ kk ].get_minimal_beam() )
-            pysixtrack_particle_to_pset( in_p, pset, jj,
-                particle_id=jj, at_element=at_element )
+            in_p.state = 1
+            in_p.elemid = at_element
+            in_p.turn = 0
+            in_p.partid = jj
+            pysixtrack_particle_to_pset( in_p, pset, jj, particle_id=jj )
         pset = None
 
     path_to_pset_file = os.path.join(
@@ -182,9 +187,8 @@ def generate_cobjects_particles( path_to_testdata_dir, conf=dict() ):
     del path_to_pset_file
 
     # -------------------------------------------------------------------------
-    # Get sixtrack sequency-by-sequence data:
+    # Get true elem-by-elem data via pysixtrack:
 
-    # Generate the initial particle disitribution buffers
     print( "****\r\n**** -> Generating pysixtack elem-by-elem particle data ..." )
 
     cbuffer = st.CBuffer()
