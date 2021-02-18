@@ -13,8 +13,16 @@ def pysixtrack_line_to_cbuffer( line, cbuffer, conf=dict() ):
         elif isinstance( elem, pysix.elements.DriftExact ):
             st.st_DriftExact( cbuffer, elem.length )
         elif isinstance( elem, pysix.elements.Multipole ):
-            st.st_Multipole( cbuffer, elem.length, elem.hxl,
-                elem.hyl, knl=elem.knl, ksl=elem.ksl, order=elem.order )
+            if elem.order > 0:
+                st.st_Multipole( cbuffer, elem.length, elem.hxl,
+                    elem.hyl, knl=elem.knl, ksl=elem.ksl, order=elem.order )
+            else:
+                mp = st.st_Multipole( cbuffer, max_order=0, order=0,
+                        length=elem.length, hxl=elem.hxl, hyl=elem.hyl )
+                if len( elem.knl ) > 0:
+                    mp.set_bal( 0, elem.knl[ 0 ] )
+                if len( elem.ksl ) > 0:
+                    mp.set_bal( 1, elem.ksl[ 0 ] )
         elif isinstance( elem, pysix.elements.Cavity ):
             st.st_Cavity( cbuffer, elem.voltage, elem.frequency, elem.lag )
         elif isinstance( elem, pysix.elements.SRotation ):
