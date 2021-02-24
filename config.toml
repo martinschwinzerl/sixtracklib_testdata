@@ -1,0 +1,21 @@
+[ default ]
+    cbuffer_norm_base_addr     = 4096
+    multipole_add_max_order    = 0
+    rf_multipole_add_max_order = 0
+    always_use_drift_exact     = false
+    make_demotrack_data        = true
+    make_sixtrack_sequ_by_sequ = false
+    make_elem_by_elem_data     = true
+    make_until_num_turn_data   = true
+    until_num_turns            = 100
+
+[ scenario ]
+    [ scenario.lhc_no_bb ]
+        source = "sixtrack"
+        input_dir = "input/"
+        make_sixtrack_sequ_by_sequ = true
+
+    [ scenario.sis100_coasting ]
+        source = "pysixtrack"
+        input_dir = "input/"
+        always_use_drift_exact = true
