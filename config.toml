@@ -1,0 +1,10 @@
+[common]
+normalised_base_addr = 4096
+always_exact_drift = false
+
+[lhc_no_bb]
+source = "sixtrack"
+
+[sis100_coasting]
+source = "pysixtrack"
+always_exact_drift = true
