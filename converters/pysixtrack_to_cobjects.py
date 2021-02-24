@@ -102,7 +102,6 @@ def calc_cbuffer_params_for_pysix_line( line, slot_size=None, conf=dict() ):
 def pysix_line_to_cbuffer( line, cbuffer, conf=dict() ):
     assert isinstance( cbuffer, st.CBufferView )
     assert isinstance( line, pysix.Line )
-
     for elem in line.elements:
         if isinstance( elem, pysix.elements.Drift ) and \
             not( conf.get( 'always_use_drift_exact', False ) ):
@@ -251,6 +250,7 @@ def pysix_particle_to_single_particle( in_p, p, state=None, at_element=None,
     p.beta0   = in_p.beta0
     p.gamma0  = in_p.gamma0
     p.p0c     = in_p.p0c
+
     p.x       = in_p.x
     p.y       = in_p.y
     p.px      = in_p.px

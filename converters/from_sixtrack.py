@@ -151,6 +151,7 @@ def generate_particle_data_initial( output_path, iconv, sixdump, conf=dict() ):
                   f"****    {path_init_dt}" )
     return
 
+
 def generate_particle_data_sequ_by_sequ( output_path, line, iconv, sixdump, conf=dict() ):
     num_iconv = int( len( iconv ) )
     num_belem = int( len( line ) )
@@ -455,4 +456,3 @@ def generate_data( scenario_name, input_path, output_path, conf=dict() ):
     generate_particle_data( input_path, output_path, conf=conf )
     print(  "**** " )
     print(  "**** " )
-
