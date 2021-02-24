@@ -7,9 +7,12 @@ def pysixtrack_line_to_cbuffer( line, cbuffer, conf=dict() ):
     assert isinstance( cbuffer, st.CBufferView )
     assert isinstance( line, pysix.Line )
 
-    for elem in line.elements:
+    for ii, elem in enumerate( line.elements ):
         if isinstance( elem, pysix.elements.Drift ):
-            st.st_Drift( cbuffer, elem.length )
+            if not conf.get( 'always_exact_drift', False ):
+                st.st_Drift( cbuffer, elem.length )
+            else:
+                st.st_DriftExact( cbuffer, elem.length )
         elif isinstance( elem, pysix.elements.DriftExact ):
             st.st_DriftExact( cbuffer, elem.length )
         elif isinstance( elem, pysix.elements.Multipole ):
@@ -23,6 +26,20 @@ def pysixtrack_line_to_cbuffer( line, cbuffer, conf=dict() ):
                     mp.set_bal( 0, elem.knl[ 0 ] )
                 if len( elem.ksl ) > 0:
                     mp.set_bal( 1, elem.ksl[ 0 ] )
+        elif isinstance( elem, pysix.elements.LimitRect ):
+            st.st_LimitRect(
+                cbuffer, elem.min_x, elem.max_x, elem.min_y, elem.max_y )
+        elif isinstance( elem, pysix.elements.LimitEllipse ):
+            st.st_LimitEllipse( cbuffer, elem.a * elem.a, elem.b * elem.b )
+        elif isinstance( elem, pysix.elements.LimitRectEllipse ):
+            st.st_LimitRectEllipse( cbuffer,
+                elem.max_x, elem.max_y, elem.a * elem.a, elem.b * elem.b )
+        elif isinstance( elem, pysix.elements.DipoleEdge ):
+            corr = 2.0 * elem.h * elem.hgap * elem.fint
+            r21 = +elem.h * np.tan( elem.e1 )
+            r43 = -elem.h * np.tan( elem.e1 -
+                ( corr / np.cos( elem.e1 ) ) * ( 1. + np.sin( elem.e1 ) ** 2 ) )
+            st.st_DipoleEdge( cbuffer, r21, r43 )
         elif isinstance( elem, pysix.elements.Cavity ):
             st.st_Cavity( cbuffer, elem.voltage, elem.frequency, elem.lag )
         elif isinstance( elem, pysix.elements.SRotation ):
@@ -30,13 +47,21 @@ def pysixtrack_line_to_cbuffer( line, cbuffer, conf=dict() ):
             st.st_SRotation( cbuffer, elem.angle * deg2rad )
         elif isinstance( elem, pysix.elements.XYShift ):
             st.st_XYShift( cbuffer, elem.dx, elem.dy )
-
+        elif isinstance( elem, pysix.be_beamfields.spacecharge.SCCoasting ):
+            st.st_SCCoasting( cbuffer, elem.number_of_particles,
+                elem.circumference, elem.sigma_x, elem.sigma_y, elem.length,
+                    elem.x_co, elem.y_co, elem.min_sigma_diff, elem.enabled )
+        elif isinstance( elem, pysix.be_beamfields.spacecharge.SCQGaussProfile ):
+            st.st_SCQGaussProfile( cbuffer, elem.number_of_particles,
+                elem.bunchlength_rms, elem.sigma_x, elem.sigma_y, elem.length,
+                    elem.x_co, elem.y_co, elem.min_sigma_diff, elem.q_param,
+                        elem.enabled )
         else:
             print( f"element not converted: {elem}" )
     return
 
 def pysixtrack_particle_to_pset( in_p, pset, index,
-    state=None, at_element=None, at_turn=None, particle_id=None ):
+    state=None, at_element=None, at_turn=None, particle_id=None, conf=dict() ):
     assert isinstance( in_p, pysix.Particles )
     assert isinstance( pset, st.st_Particles )
     assert index < pset.num_particles
@@ -97,7 +122,7 @@ def pysixtrack_particle_to_pset( in_p, pset, index,
 
 
 def pysixtrack_particle_to_single_particle( in_p, p,
-    state=None, at_element=None, at_turn=None, particle_id=None ):
+    state=None, at_element=None, at_turn=None, particle_id=None, conf=dict() ):
     assert isinstance( in_p, pysix.Particles )
     assert isinstance( p, st.st_SingleParticle )
 
@@ -136,26 +161,6 @@ def pysixtrack_particle_to_single_particle( in_p, p,
     p.px = in_p.px
     p.py = in_p.py
     p.zeta = in_p.zeta
-
-    #print( f"pset.delta  = {p.delta}" )
-    #print( f"in_p.delta  = {in_p.delta}" )
-    #print( f"diff        = {p.delta-in_p.delta}\r\n" )
-
-    #print( f"pset.rpp    = {p.rpp}" )
-    #print( f"in_p.rpp    = {in_p.rpp}" )
-    #print( f"diff        = {p.rpp-in_p.rpp}\r\n" )
-
-    #print( f"pset.rvv    = {p.rvv}" )
-    #print( f"in_p.rvv    = {in_p.rvv}" )
-    #print( f"diff        = {p.rvv-in_p.rvv}\r\n" )
-
-    #print( f"pset.psigma = {p.psigma}" )
-    #print( f"in_p.psigma = {in_p.psigma}" )
-    #print( f"diff        = {p.psigma-in_p.psigma}\r\n" )
-
-    #print( f"pset.beta0  = {pset.beta0}" )
-    #print( f"in_p.beta0  = {in_p.beta0}" )
-    #print( f"diff        = {pset.beta0-in_p.beta0}\r\n" )
 
     EPS = np.float64( 1e-12 )
     p.update_delta( in_p.delta )
