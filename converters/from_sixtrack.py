@@ -84,7 +84,6 @@ def generate_particle_data_initial( output_path, iconv, sixdump, conf=dict() ):
     MAKE_DEMOTRACK = conf.get( "make_demotrack_data", False )
     MAKE_DEMOTRACK &= st.Demotrack_enabled()
     init_particle_idx = 0
-    start_at_element = iconv[ init_particle_idx ]
 
     initial_p_buffer = create_single_particle_cbuffer( 1, num_part, conf )
     initial_pset_buffer = create_particle_set_cbuffer( 1, num_part, conf )
@@ -94,21 +93,26 @@ def generate_particle_data_initial( output_path, iconv, sixdump, conf=dict() ):
     for jj in range( num_part ):
         kk = num_part * init_particle_idx + jj
         assert kk < len( sixdump.particles )
-        initial_p_pysix.append( pysix.Particles(
-            **sixdump[ kk ].get_minimal_beam() ) )
-
-        initial_p_pysix[ -1 ].elemid = start_at_element
-        initial_p_pysix[ -1 ].turn = 0
-        initial_p_pysix[ -1 ].partid = jj
-        initial_p_pysix[ -1 ].state = 1
+        in_p = pysix.Particles( **sixdump[ kk ].get_minimal_beam() )
+        in_p.state  = 1
+        in_p.turn   = 0
+        in_p.partid = jj
+        in_p.elemid = iconv[ init_particle_idx ]
 
         p = st.st_SingleParticle.GET( initial_p_buffer, kk )
-        pysix_particle_to_single_particle( initial_p_pysix[ -1 ], p, conf=conf )
+        pysix_particle_to_single_particle( in_p, p, conf=conf )
 
         pset = st.st_Particles.GET( initial_pset_buffer, 0 )
-        pysix_particle_to_pset( initial_p_pysix[ -1 ], pset, jj, conf=conf )
+        pysix_particle_to_pset( in_p, pset, jj, conf=conf )
+        initial_p_pysix.append( in_p )
 
     assert len( initial_p_pysix ) == num_part
+    for ii, in_p in enumerate( initial_p_pysix ):
+        assert in_p.state == 1
+        assert in_p.partid == ii
+        assert in_p.turn == 0
+        assert in_p.elemid == iconv[ 0 ]
+
     path_init_pset = os.path.join( output_path, "cobj_initial_particles.bin" )
     if  0 == initial_pset_buffer.tofile_normalised( path_init_pset, NORM_ADDR ):
         print( "**** -> Generated initial particle set data at:\r\n"
@@ -169,11 +173,10 @@ def generate_particle_data_sequ_by_sequ( output_path, line, iconv, sixdump, conf
 
     NORM_ADDR = conf.get( "cbuffer_norm_base_addr", 4096 )
     pset_buffer = create_particle_set_cbuffer(
-        num_iconv + 1, num_particles, conf )
+        num_iconv, num_particles, conf )
 
     for ii in range( num_iconv ):
-        at_element = iconv[ ii ]
-        assert at_element < num_belem
+        assert iconv[ ii ] < num_belem
         assert ii < pset_buffer.num_objects
         pset = st.st_Particles.GET( pset_buffer, ii )
         assert pset.num_particles == num_particles
@@ -183,8 +186,8 @@ def generate_particle_data_sequ_by_sequ( output_path, line, iconv, sixdump, conf
             in_p = pysix.Particles( **sixdump[ kk ].get_minimal_beam() )
             in_p.state = 1
             in_p.turn = 0
-            in_p.id = jj
-            in_p.at_element = at_element
+            in_p.partid = jj
+            in_p.elemid = iconv[ ii ]
             assert pset.num_particles == num_particles
             pysix_particle_to_pset( in_p, pset, jj, conf=conf )
     path_cobj_pset = os.path.join( output_path, "cobj_particles_sixtrack.bin" )
@@ -210,8 +213,6 @@ def generate_particle_data_elem_by_elem( output_path, line, iconv, sixdump, conf
     assert num_belem > 0
     assert num_iconv > 0
 
-    start_at_element = iconv[ 0 ]
-
     NORM_ADDR = conf.get( "cbuffer_norm_base_addr", 4096 )
     MAKE_DEMOTRACK = conf.get( "make_demotrack_data", False )
     MAKE_DEMOTRACK &= st.Demotrack_enabled()
@@ -227,6 +228,11 @@ def generate_particle_data_elem_by_elem( output_path, line, iconv, sixdump, conf
         initial_p_pysix = pickle.load( f_in )
     assert initial_p_pysix is not None
     assert len( initial_p_pysix ) == num_particles
+    for ii, in_p in enumerate( initial_p_pysix ):
+        assert ii == in_p.partid
+        assert 0  == in_p.turn
+        assert iconv[ 0 ] == in_p.elemid
+        assert 1 == in_p.state
 
     if MAKE_DEMOTRACK:
         dt_p = st.st_DemotrackParticle()
@@ -237,33 +243,31 @@ def generate_particle_data_elem_by_elem( output_path, line, iconv, sixdump, conf
 
     for ii, in_p in enumerate( initial_p_pysix ):
         assert isinstance( in_p, pysix.Particles )
-        in_p.elemid = start_at_element
-        in_p.turn = 0
-        in_p.partid = ii
-        in_p.state = 1
+        #in_p.state  = 1
+        #in_p.turn   = 0
+        #in_p.partid = ii
+        #in_p.elemid = iconv[ 0 ]
 
         print( f"****    Info :: particle {ii:6d}/{num_particles - 1:6d}" )
         for jj, elem in enumerate( line.elements ):
             pset = st.st_Particles.GET( pset_buffer, jj )
             assert pset.num_particles == num_particles
             kk = ii * num_belem + jj
-            pysix_particle_to_pset(
-                in_p, pset, ii, particle_id=ii, at_element=jj, conf=conf )
+            pysix_particle_to_pset( in_p, pset, ii, conf=conf )
             if MAKE_DEMOTRACK:
                 dt_p.clear()
                 dt_p.from_cobjects( pset, ii )
                 dt_p.to_array( dt_pset_buffer, kk )
             if in_p.state == 1:
                 elem.track( in_p )
-        pset = st.st_Particles.GET( pset_buffer, num_belem )
-        assert pset.num_particles == num_particles
         if in_p.state == 1:
             in_p.turn += 1
-            in_p.elemid = start_at_element
+            in_p.elemid = iconv[ 0 ]
         else:
             print( f"lost particle {in_p}" )
-        pysix_particle_to_pset( in_p, pset, ii, particle_id=ii,
-            at_element=start_at_element, conf=conf )
+        pset = st.st_Particles.GET( pset_buffer, num_belem )
+        assert pset.num_particles == num_particles
+        pysix_particle_to_pset( in_p, pset, ii, conf=conf )
         if MAKE_DEMOTRACK:
             dt_p.clear()
             dt_p.from_cobjects( pset, ii )
@@ -319,6 +323,11 @@ def generate_particle_data_until_turn( output_path, line, iconv, sixdump, until_
         initial_p_pysix = pickle.load( f_in )
     assert initial_p_pysix is not None
     assert len( initial_p_pysix ) == num_particles
+    for ii, in_p in enumerate( initial_p_pysix ):
+        assert ii == in_p.partid
+        assert 0  == in_p.turn
+        assert iconv[ 0 ] == in_p.elemid
+        assert 1 == in_p.state
 
     if MAKE_DEMOTRACK:
         dt_p = st.st_DemotrackParticle()
@@ -327,10 +336,10 @@ def generate_particle_data_until_turn( output_path, line, iconv, sixdump, until_
         assert len( dt_pset_buffer ) <= num_particles
 
     for ii, in_p in enumerate( initial_p_pysix ):
-        in_p.elemid = start_at_element
-        in_p.turn = 0
-        in_p.partid = ii
-        in_p.state = 1
+        #in_p.elemid = start_at_element
+        #in_p.turn = 0
+        #in_p.partid = ii
+        #in_p.state = 1
         print( f"****    Info :: particle {ii:6d}/{num_particles - 1:6d}" )
         for jj in range( in_p.turn, until_turn ):
             for kk, elem in enumerate( line.elements ):
