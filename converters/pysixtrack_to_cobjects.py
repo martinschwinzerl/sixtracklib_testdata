@@ -11,23 +11,19 @@ def calc_cbuffer_params_for_pysix_line( line, slot_size=None, conf=dict() ):
     n_objects = 0
     n_pointers = 0
     for ii, elem in enumerate( line.elements ):
-        if isinstance( elem, pysix.elements.Drift ) and \
-            not( conf.get( 'always_use_drift_exact', False ) ):
-            n_objects += 1
-            n_slots += st.st_Drift.COBJ_REQUIRED_NUM_SLOTS( slot_size )
-            n_pointers += st.st_Drift.COBJ_NUM_DATAPTRS
-            continue
+        if isinstance( elem, pysix.elements.Drift ):
+            if conf.get( 'always_use_drift_exact', False ) or \
+                isinstance( elem, pysix.elements.DriftExact ):
+                n_objects += 1
+                n_slots += st.st_DriftExact.COBJ_REQUIRED_NUM_SLOTS( slot_size )
+                n_pointers += st.st_DriftExact.COBJ_NUM_DATAPTRS
+            else:
+                n_objects += 1
+                n_slots += st.st_Drift.COBJ_REQUIRED_NUM_SLOTS( slot_size )
+                n_pointers += st.st_Drift.COBJ_NUM_DATAPTRS
 
-        if isinstance( elem, pysix.elements.DriftExact ) or (
-            isinstance( elem, pysix.elements.Drift ) and
-            conf.get( 'always_use_drift_exact', False ) ):
-            n_objects += 1
-            n_slots += st.st_DriftExact.COBJ_REQUIRED_NUM_SLOTS( slot_size )
-            n_pointers += st.st_DriftExact.COBJ_NUM_DATAPTRS
             continue
-
         assert not isinstance( elem, pysix.elements.Drift )
-        assert not isinstance( elem, pysix.elements.DriftExact )
 
         if isinstance( elem, pysix.elements.DipoleEdge ):
             n_objects  += 1
@@ -103,19 +99,15 @@ def pysix_line_to_cbuffer( line, cbuffer, conf=dict() ):
     assert isinstance( cbuffer, st.CBufferView )
     assert isinstance( line, pysix.Line )
     for elem in line.elements:
-        if isinstance( elem, pysix.elements.Drift ) and \
-            not( conf.get( 'always_use_drift_exact', False ) ):
-            cobj_elem = st.st_Drift( cbuffer, elem.length )
-            continue
-
-        if isinstance( elem, pysix.elements.DriftExact ) or (
-            isinstance( elem, pysix.elements.Drift ) and
-            conf.get( 'always_use_drift_exact', False ) ):
-            cobj_elem = st.st_DriftExact( cbuffer, elem.length )
+        if isinstance( elem, pysix.elements.Drift ):
+            if conf.get( 'always_use_drift_exact', False ) or \
+                isinstance( elem, pysix.elements.DriftExact ):
+                cobj_elem = st.st_DriftExact( cbuffer, elem.length )
+            else:
+                cobj_elem = st.st_Drift( cbuffer, elem.length )
             continue
 
         assert not isinstance( elem, pysix.elements.Drift )
-        assert not isinstance( elem, pysix.elements.DriftExact )
 
         if isinstance( elem, pysix.elements.DipoleEdge ):
             cobj_elem = st.st_DipoleEdge(
