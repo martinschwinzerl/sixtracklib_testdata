@@ -228,11 +228,6 @@ def generate_particle_data_elem_by_elem( output_path, line, iconv, sixdump, conf
         initial_p_pysix = pickle.load( f_in )
     assert initial_p_pysix is not None
     assert len( initial_p_pysix ) == num_particles
-    for ii, in_p in enumerate( initial_p_pysix ):
-        assert ii == in_p.partid
-        assert 0  == in_p.turn
-        assert iconv[ 0 ] == in_p.elemid
-        assert 1 == in_p.state
 
     if MAKE_DEMOTRACK:
         dt_p = st.st_DemotrackParticle()
@@ -243,35 +238,55 @@ def generate_particle_data_elem_by_elem( output_path, line, iconv, sixdump, conf
 
     for ii, in_p in enumerate( initial_p_pysix ):
         assert isinstance( in_p, pysix.Particles )
-        #in_p.state  = 1
-        #in_p.turn   = 0
-        #in_p.partid = ii
-        #in_p.elemid = iconv[ 0 ]
-
+        assert isinstance( in_p, pysix.Particles )
+        assert in_p.elemid == iconv[ 0 ]
+        assert in_p.partid == ii
+        assert in_p.turn == 0
+        assert in_p.state == 1
         print( f"****    Info :: particle {ii:6d}/{num_particles - 1:6d}" )
+
         for jj, elem in enumerate( line.elements ):
+            assert in_p.elemid == jj
+            assert in_p.partid == ii
+            assert in_p.turn == 0
+            assert in_p.state == 1
+
             pset = st.st_Particles.GET( pset_buffer, jj )
             assert pset.num_particles == num_particles
-            kk = ii * num_belem + jj
             pysix_particle_to_pset( in_p, pset, ii, conf=conf )
+
             if MAKE_DEMOTRACK:
                 dt_p.clear()
                 dt_p.from_cobjects( pset, ii )
+                kk = jj * num_particles + ii
                 dt_p.to_array( dt_pset_buffer, kk )
             if in_p.state == 1:
                 elem.track( in_p )
+
+            if isinstance( elem, pysix.elements.Drift ) and in_p.state == 1 and \
+                ( in_p.x > 1.0 or in_p.x < -1.0 or
+                  in_p.y > 1.0 or in_p.y < -1.0 ):
+                in_p.state = 0
+
+            if in_p.state == 1:
+                in_p.elemid += 1
+            else:
+                print( f"lost particle {in_p.partid} at pos {in_p.elemid} : {in_p}" )
+                print( f"lost particle {in_p.partid} at elem: {elem}" )
+                break
+
         if in_p.state == 1:
             in_p.turn += 1
             in_p.elemid = iconv[ 0 ]
         else:
-            print( f"lost particle {in_p}" )
+            print( f"lost particle {in_p.partid}" )
         pset = st.st_Particles.GET( pset_buffer, num_belem )
         assert pset.num_particles == num_particles
         pysix_particle_to_pset( in_p, pset, ii, conf=conf )
         if MAKE_DEMOTRACK:
             dt_p.clear()
             dt_p.from_cobjects( pset, ii )
-            dt_p.to_array( dt_pset_buffer, ii * num_belem + num_belem )
+            dt_p.to_array( dt_pset_buffer, num_particles * num_belem + ii )
 
     path_elem_by_elem = os.path.join(
         output_path, "cobj_particles_elem_by_elem_pysixtrack.bin" )

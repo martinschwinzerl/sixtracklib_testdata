@@ -213,15 +213,17 @@ def generate_particle_data_elem_by_elem( input_path, output_path, conf=dict() ):
             if in_p.state == 1:
                 elem.track( in_p )
 
-            if isinstance( elem, pysix.elements.Drift ):
-                if in_p.x > 1.0 or in_p.x < -1.0 or in_p.y > 1.0 or in_p.y < -1.0:
-                    in_p.state = 0
+            if isinstance( elem, pysix.elements.Drift ) and \
+                in_p.state == 1 and \
+                ( in_p.x > 1.0 or in_p.x < -1.0 or
+                  in_p.y > 1.0 or in_p.y < -1.0 ):
+                in_p.state = 0
 
             if in_p.state == 1:
                 in_p.elemid += 1
             else:
-                print( f"lost particle {ii} at pos {jj} : {in_p}" )
-                print( f"lost particle {ii} elem: {elem}" )
+                print( f"lost particle {in_p.partid} at pos {in_p.elemid} : {in_p}" )
+                print( f"lost particle {in_p.partid} at elem: {elem}" )
                 break
         if in_p.state == 1:
             in_p.turn += 1
