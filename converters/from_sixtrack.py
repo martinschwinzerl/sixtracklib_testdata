@@ -351,25 +351,39 @@ def generate_particle_data_until_turn( output_path, line, iconv, sixdump, until_
         assert len( dt_pset_buffer ) <= num_particles
 
     for ii, in_p in enumerate( initial_p_pysix ):
-        #in_p.elemid = start_at_element
-        #in_p.turn = 0
-        #in_p.partid = ii
-        #in_p.state = 1
+        assert isinstance( in_p, pysix.Particles )
         print( f"****    Info :: particle {ii:6d}/{num_particles - 1:6d}" )
         for jj in range( in_p.turn, until_turn ):
             for kk, elem in enumerate( line.elements ):
+                assert in_p.elemid == kk
+                assert in_p.partid == ii
+                assert in_p.turn == jj
+                assert in_p.state == 1
+
                 if in_p.state == 1:
                     elem.track( in_p )
+
+                if isinstance( elem, pysix.elements.Drift ) and \
+                    in_p.state == 1 and (
+                    in_p.x > 1.0 or in_p.x < -1.0 or
+                    in_p.y > 1.0 or in_p.y < -1.0 ):
+                    in_p.state = 0
+
+                if in_p.state == 1:
+                    in_p.elemid += 1
                 else:
+                    print( f"lost particle {in_p.partid} at pos {in_p.elemid} : {in_p}" )
+                    print( f"lost particle {in_p.partid} at elem: {elem}" )
                     break
+
             if in_p.state == 1:
                 in_p.turn += 1
                 in_p.elemid = start_at_element
             else:
                 break
-        pysix_particle_to_pset( in_p, pset, ii, conf=conf )
         if in_p.state != 1:
-            print( f"lost particle {in_p}" )
+            print( f"lost particle {in_p.partid} at pos {in_p.elem} / turn  {in_p.turn}: {in_p}" )
+        pysix_particle_to_pset( in_p, pset, ii, conf=conf )
         if MAKE_DEMOTRACK:
             dt_p.clear()
             dt_p.from_cobjects( pset, ii )

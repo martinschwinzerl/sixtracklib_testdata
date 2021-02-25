@@ -307,6 +307,7 @@ def generate_particle_data_until_turn( input_path, output_path, until_turn, conf
                     if in_p.state == 1:
                         elem.track( in_p )
                     if isinstance( elem, pysix.elements.Drift ) and \
+                        in_p.state == 1 and \
                         ( in_p.x > 1.0 or in_p.x < -1.0 or
                           in_p.y > 1.0 or in_p.y < -1.0 ):
                         in_p.state = 0
