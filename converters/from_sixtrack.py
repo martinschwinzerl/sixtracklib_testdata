@@ -181,9 +181,12 @@ def generate_particle_data_sequ_by_sequ( output_path, line, iconv, sixdump, conf
             kk = num_particles * ii + jj
             assert kk < num_dumps
             in_p = pysix.Particles( **sixdump[ kk ].get_minimal_beam() )
+            in_p.state = 1
+            in_p.turn = 0
+            in_p.id = jj
+            in_p.at_element = at_element
             assert pset.num_particles == num_particles
-            pysix_particle_to_pset( in_p, pset, jj, particle_id=jj,
-                at_element=at_element, conf=conf )
+            pysix_particle_to_pset( in_p, pset, jj, conf=conf )
     path_cobj_pset = os.path.join( output_path, "cobj_particles_sixtrack.bin" )
     if 0 == pset_buffer.tofile_normalised( path_cobj_pset, NORM_ADDR ):
         print( "**** -> Generated cbuffer of sixtrack particle sequ-by-sequ "
