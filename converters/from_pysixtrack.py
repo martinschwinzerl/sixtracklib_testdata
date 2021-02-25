@@ -25,7 +25,7 @@ def generate_lattice_data( input_path, output_path, conf=dict() ):
     print( "**** -> Reading sixtrack input data from:\r\n" +
           f"****    {input_path}" )
     slot_size = st.CBufferView.DEFAULT_SLOT_SIZE
-    path_in_line = os.path.join( input_path, "pysixtrack_lattice.pickle" )
+    path_in_line = os.path.join( input_path, "pysixtrack_line.pickle" )
     with open( path_in_line, "rb" ) as f_in:
         line = pickle.load( f_in )
 
@@ -41,6 +41,19 @@ def generate_lattice_data( input_path, output_path, conf=dict() ):
               f"****    {path_to_lattice}" )
     else:
         raise RuntimeError( "Problem during creation of lattice data" )
+
+    if conf.get( 'always_use_drift_exact', False ):
+        for ii in range( 0, len( line.elements ) ):
+            if isinstance( line.elements[ ii ], pysix.elements.Drift ) and \
+                not isinstance( line.elements[ ii ], pysix.elements.DriftExact ):
+                new_elem = pysix.elements.DriftExact(
+                    length=line.elements[ ii ].length )
+                line.elements[ ii ] = new_elem
+                assert isinstance( line.elements[ ii ], pysix.elements.DriftExact )
+
+        for elem in line.elements:
+            assert not isinstance( elem, pysix.elements.Drift ) or \
+                   isinstance( elem, pysix.elements.DriftExact )
 
     path_to_pysix_lattice = os.path.join( output_path, "pysixtrack_lattice.pickle" )
 
@@ -143,13 +156,13 @@ def generate_particle_data_initial( input_path, output_path, conf=dict() ):
 
 def generate_particle_data_elem_by_elem( input_path, output_path, conf=dict() ):
     path_in_particles = os.path.join(
-        input_path, "pysixtrack_initial_particles.pickle" )
+        output_path, "pysixtrack_initial_particles.pickle" )
     with open( path_in_particles, "rb" ) as f_in:
         initial_p_pysix = pickle.load( f_in )
         print( "**** -> Read input data from:\r\n" +
                f"****    {path_in_particles}" )
 
-    path_in_line = os.path.join( input_path, "pysixtrack_lattice.pickle" )
+    path_in_line = os.path.join( output_path, "pysixtrack_lattice.pickle" )
     with open( path_in_line, "rb" ) as f_in:
         line = pickle.load( f_in )
 
@@ -174,37 +187,56 @@ def generate_particle_data_elem_by_elem( input_path, output_path, conf=dict() ):
 
     for ii, in_p in enumerate( initial_p_pysix ):
         assert isinstance( in_p, pysix.Particles )
-        in_p.elemid = start_at_element
-        in_p.turn = 0
-        in_p.partid = ii
-        in_p.state = 1
+        assert in_p.elemid == start_at_element
+        assert in_p.partid == ii
+        assert in_p.turn == 0
+        assert in_p.state == 1
 
         print( f"****    Info :: particle {ii:6d}/{num_part - 1:6d}" )
-        for jj, elem in enumerate( line.elements ):
+        for jj, elem in enumerate( line ):
             pset = st.st_Particles.GET( pset_buffer, jj )
             assert pset.num_particles == num_part
-            kk = ii * num_belem + jj
-            pysix_particle_to_pset(
-                in_p, pset, ii, particle_id=ii, at_element=jj, conf=conf )
+            assert in_p.elemid == jj
+            assert in_p.partid == ii
+            assert in_p.turn == 0
+            assert in_p.state == 1
+            if conf.get( 'always_use_drift_exact', False ):
+                assert not isinstance( elem, pysix.elements.Drift ) or \
+                       isinstance( elem, pysix.elements.DriftExact )
+            pysix_particle_to_pset( in_p, pset, ii, conf=conf )
             if MAKE_DEMOTRACK:
                 dt_p.clear()
                 dt_p.from_cobjects( pset, ii )
+                kk = jj * num_part + ii
+                assert kk < len( dt_pset_buffer )
                 dt_p.to_array( dt_pset_buffer, kk )
             if in_p.state == 1:
                 elem.track( in_p )
-        pset = st.st_Particles.GET( pset_buffer, num_belem )
-        assert pset.num_particles == num_part
+
+            if isinstance( elem, pysix.elements.Drift ):
+                if in_p.x > 1.0 or in_p.x < -1.0 or in_p.y > 1.0 or in_p.y < -1.0:
+                    in_p.state = 0
+
+            if in_p.state == 1:
+                in_p.elemid += 1
+            else:
+                print( f"lost particle {ii} at pos {jj} : {in_p}" )
+                print( f"lost particle {ii} elem: {elem}" )
+                break
         if in_p.state == 1:
             in_p.turn += 1
             in_p.elemid = start_at_element
         else:
-            print( f"lost particle {in_p}" )
-        pysix_particle_to_pset( in_p, pset, ii, particle_id=ii,
-            at_element=start_at_element, conf=conf )
+            print( f"lost particle {ii} at pos {in_p.elemid}: {in_p}" )
+        pset = st.st_Particles.GET( pset_buffer, num_belem )
+        assert pset.num_particles == num_part
+        pysix_particle_to_pset( in_p, pset, ii, conf=conf )
         if MAKE_DEMOTRACK:
             dt_p.clear()
             dt_p.from_cobjects( pset, ii )
-            dt_p.to_array( dt_pset_buffer, ii * num_belem + num_belem )
+            kk = num_belem * num_part + ii
+            assert len( dt_pset_buffer ) > kk
+            dt_p.to_array( dt_pset_buffer, kk )
 
     path_elem_by_elem = os.path.join(
         output_path, "cobj_particles_elem_by_elem_pysixtrack.bin" )
@@ -227,13 +259,13 @@ def generate_particle_data_elem_by_elem( input_path, output_path, conf=dict() ):
 
 def generate_particle_data_until_turn( input_path, output_path, until_turn, conf=dict() ):
     path_in_particles = os.path.join(
-        input_path, "pysixtrack_initial_particles.pickle" )
+        output_path, "pysixtrack_initial_particles.pickle" )
     with open( path_in_particles, "rb" ) as f_in:
         initial_p_pysix = pickle.load( f_in )
         print( "**** -> Read input data from:\r\n" +
                f"****    {path_in_particles}" )
 
-    path_in_line = os.path.join( input_path, "pysixtrack_lattice.pickle" )
+    path_in_line = os.path.join( output_path, "pysixtrack_lattice.pickle" )
     with open( path_in_line, "rb" ) as f_in:
         line = pickle.load( f_in )
 
@@ -250,14 +282,6 @@ def generate_particle_data_until_turn( input_path, output_path, until_turn, conf
     pset = st.st_Particles.GET( pset_buffer, 0 )
     assert pset.num_particles == num_part
 
-    path_initial_pysix_particles = os.path.join(
-        output_path, "pysixtrack_initial_particles.pickle" )
-    initial_p_pysix = None
-    with open( path_initial_pysix_particles, "rb" ) as f_in:
-        initial_p_pysix = pickle.load( f_in )
-    assert initial_p_pysix is not None
-    assert len( initial_p_pysix ) == num_part
-
     if MAKE_DEMOTRACK:
         dt_p = st.st_DemotrackParticle()
         dt_pset_buffer = st.st_DemotrackParticle.CREATE_ARRAY( num_part, True )
@@ -266,18 +290,30 @@ def generate_particle_data_until_turn( input_path, output_path, until_turn, conf
 
     for ii, in_p in enumerate( initial_p_pysix ):
         assert isinstance( in_p, pysix.Particles )
-        in_p.elemid = start_at_element
-        in_p.turn = 0
-        in_p.partid = ii
-        in_p.state = 1
+        assert in_p.elemid == start_at_element
+        assert in_p.partid == ii
+        assert in_p.state == 1
+        assert in_p.turn == 0
         print( f"****    Info :: particle {ii:6d}/{num_part - 1:6d}" )
         start_at_turn = in_p.turn
         if start_at_turn < until_turn:
             for jj in range( start_at_turn, until_turn ):
-                for kk, elem in enumerate( line.elements ):
+                for kk, elem in enumerate( line ):
+                    if conf.get( 'always_use_drift_exact', False ):
+                        assert not isinstance( elem, pysix.elements.Drift ) or \
+                            isinstance( elem, pysix.elements.DriftExact )
                     if in_p.state == 1:
                         elem.track( in_p )
+                    if isinstance( elem, pysix.elements.Drift ) and \
+                        ( in_p.x > 1.0 or in_p.x < -1.0 or
+                          in_p.y > 1.0 or in_p.y < -1.0 ):
+                        in_p.state = 0
+
+                    if in_p.state == 1:
+                        in_p.elemid += 1
                     else:
+                        print( f"lost particle {ii} at pos {jj} : {in_p}" )
+                        print( f"lost particle at elem: {elem}" )
                         break
                 if in_p.state == 1:
                     in_p.turn += 1
@@ -285,7 +321,7 @@ def generate_particle_data_until_turn( input_path, output_path, until_turn, conf
                 else:
                     break
         if in_p.state != 1:
-            print( f"lost particle {in_p}" )
+            print( f"lost particle {in_p.partid} at pos {in_p.elem} / turn  {in_p.turn}: {in_p}" )
         pysix_particle_to_pset( in_p, pset, ii, )
         if MAKE_DEMOTRACK:
             dt_p.clear()
@@ -321,7 +357,7 @@ def generate_particle_data( input_path, output_path, conf=dict() ):
         print( "**** -> Read input data from:\r\n" +
                f"****    {path_in_particles}" )
 
-    path_in_line = os.path.join( input_path, "pysixtrack_lattice.pickle" )
+    path_in_line = os.path.join( input_path, "pysixtrack_line.pickle" )
     with open( path_in_line, "rb" ) as f_in:
         line = pickle.load( f_in )
 
